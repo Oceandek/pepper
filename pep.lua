@@ -196,7 +196,7 @@ local function autoTap(name)
         end
 
         for _, breakable in pairs(breakables) do
-            if string.find(breakable:GetAttribute("BreakableID"):lower(), name:lower()) then
+            if string.find(breakable:GetAttribute("BreakableID"):lower(), name:lower()) and not string.find(breakable:GetAttribute("BreakableID"):lower(), "vip") then
                 return breakable:GetAttribute("BreakableUID")
             end
         end
@@ -210,7 +210,7 @@ local function autoTap(name)
                BreakableUID = getBreakable()
             end
 
-            Signal.Fire("AutoClicker_Nearby", BreakableUID or AutoTapper.GetNearestBreakable():GetAttribute("BreakableUID"))
+            pcall(function() Signal.Fire("AutoClicker_Nearby", BreakableUID or AutoTapper.GetNearestBreakable():GetAttribute("BreakableUID")) end)
 
             task.wait(.1)
         end
@@ -270,9 +270,9 @@ QuestFunctions = {
             return table.insert(IgnoredQuests, parentFunc())
         end
         game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = workspace.__THINGS.Instances.SpawnObby.Teleports.Enter.CFrame
-        task.wait(9)
+        task.wait(12)
         game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = workspace.__THINGS.__INSTANCE_CONTAINER.Active.SpawnObby.Goal.Pad.CFrame
-        NotificationCmds.Message.Bottom({Color=Color3.new(1, 1, 1), Message="Completed Jungle Obby"})
+        NotificationCmds.Message.Bottom({Color=Color3.new(1, 1, 1), Message="Completed Spawn Obby"})
         task.wait(3)
     end,
     JUNGLE_OBBY = function()
@@ -280,21 +280,21 @@ QuestFunctions = {
             return table.insert(IgnoredQuests, parentFunc())
         end
         LocalPlayer.Character.HumanoidRootPart.CFrame = workspace.__THINGS.Instances.JungleObby.Teleports.Enter.CFrame
-        task.wait(9)
+        task.wait(12)
         LocalPlayer.Character.HumanoidRootPart.CFrame = workspace.__THINGS.__INSTANCE_CONTAINER.Active.JungleObby.Interactable.Goal.Pad.CFrame
         NotificationCmds.Message.Bottom({Color=Color3.new(1, 1, 1), Message="Completed Jungle Obby"})
         task.wait(5)
     end,
     ICE_OBBY = function()
         LocalPlayer.Character.HumanoidRootPart.CFrame = workspace.__THINGS.Instances.IceObby.Teleports.Enter.CFrame
-        task.wait(9)
+        task.wait(12)
         LocalPlayer.Character.HumanoidRootPart.CFrame = workspace.__THINGS.__INSTANCE_CONTAINER.Active.IceObby.Interactable.Goal.Pad.CFrame
         NotificationCmds.Message.Bottom({Color=Color3.new(1, 1, 1), Message="Completed Jungle Obby"})
         task.wait(3)
     end,
     PYRAMID_OBBY = function()
         LocalPlayer.Character.HumanoidRootPart.CFrame = workspace.__THINGS.Instances.PyramidObby.Teleports.Enter.CFrame
-        task.wait(9)
+        task.wait(12)
         LocalPlayer.Character.HumanoidRootPart.CFrame = workspace.__THINGS.__INSTANCE_CONTAINER.Active.PyramidObby.Interactable.Goal.Pad.CFrame
         NotificationCmds.Message.Bottom({Color=Color3.new(1, 1, 1), Message="Completed Pyramid Obby"})
         task.wait(3)
@@ -478,12 +478,12 @@ QuestFunctions = {
             ZoneNumber = ZoneNumber + 1
             Zone = ZonesUtil.GetZoneFromNumber(ZoneNumber)
 
-            if ZoneNumber > MaxZoneData.ZoneNumber then
+            if ZoneNumber >= MaxZoneData.ZoneNumber then
                 table.insert(DelayedQuests, {Quest = parentFunc(), Time = tick() + 120})
                 return NotificationCmds.Message.Bottom({Color=Color3.new(1, 1, 1), Message="Paused Diamond Pile"})
             end
 
-            task.wait(1)
+            task.wait(.5)
         until getQuest(num).Progress >= getQuest(num).Amount or getQuest(num).Name ~= cn
 
         autoTapper:Stop()
@@ -617,6 +617,8 @@ QuestFunctions = {
     end,
     NON_BLOCKING_BEST_COMET = function(num)
         local Zone = ZoneCmds.GetMaxOwnedZone()
+
+        --TeleportToZone(Zone)
 
         task.wait(1)
     
@@ -839,6 +841,7 @@ task.spawn(function()
                 CurrentlyFarming = false
                 task.wait(.1)
                 questFunc(i)
+                TeleportToZone(ZoneCmds.GetMaxOwnedZone())
                 CurrentlyFarming = true
                 --NotificationCmds.Message.Bottom({Color=Color3.new(1, 1, 1), Message="Completed "..quest.Name})
             else
