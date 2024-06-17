@@ -2,24 +2,28 @@ getgenv().AutoProgress = false
 --task.wait(2)
 getgenv().AutoProgress = true
 getgenv().Config = {
-    PotatoMode = false, -- ⚠️
     AutoWorld = {
         Enabled = true,
-        PurchasePetSlots = true, -- 🙏
-        AutoTap = true -- 🙏
+        PurchasePetSlots = true,
+        AutoTap = true,
+        UseTntOnDelay = false, -- Use tnt on set intervals, does not respect SmartTnt
+        TntDelay = 10,
+        SmartTnt = false,
+        UseTntOnNewZone = false,
     },
     AutoRank = {
-        Enabled = true, -- 🙏
-        InitialRank = 10, -- Rank up to rank 3 before/during Auto World, false to skip. 🙏
-        Flags = {"Magnet Flag", "Coins Flag", "Hasty Flag", "Magnet Flag", "Diamonds Flag"}, -- Flags to use for USE_FLAG quest 🙏
-        Potions = {"Damage", "Coins", "Egg", "Speed", "Diamonds", "Treasure Hunter"} -- Potions to use for USE_POTION quest 🙏
+        Enabled = true,
+        InitialRank = 10, -- Rank up to rank n before/during Auto World, false to skip.
+        Flags = {"Magnet Flag", "Coins Flag", "Hasty Flag", "Magnet Flag", "Diamonds Flag"}, -- Flags to use for USE_FLAG quest
+        Potions = {"Damage", "Coins", "Egg", "Speed", "Diamonds", "Treasure Hunter"} -- Potions to use for USE_POTION quest
     },
-    SmartTnt = false, -- 🙏
-    UseTntOnNewZone = false, -- 🙏
-    UseTntOnDelay = false, -- Use tnt on set intervals, does not respect SmartTnt -- ⚠️
-    TntDelay = 10 -- Interval Delay -- ⚠️
+    Performance = {
+        SetFpsCap = 999,
+        Disable3dRendering = true,
+        SimpleFpsBooster = true,
+    }
 }
-getgenv().SmartTntConfig = { -- 🙏
+getgenv().SmartTntConfig = {
     [0] = { -- Rebirth Number
         Max = 25, -- Max Zone to use TNT at
         Min = 1 -- Min Zone to use TNT at
@@ -38,6 +42,9 @@ getgenv().SmartTntConfig = { -- 🙏
     }
 }
 
+setfpscap(Config.Performance.SetFpsCap)
+game:GetService("RunService"):Set3dRenderingEnabled((not Config.Performance.Disable3dRendering))
+
 -- Services
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local HttpService = game:GetService("HttpService")
@@ -49,6 +56,8 @@ local Directory = ReplicatedStorage.__DIRECTORY
 local Network = ReplicatedStorage.Network
 
 local NetworkModule = require(Library.Client.Network)
+local TabController = require(game.ReplicatedStorage.Library.Client.TabController)
+local GUI = require(ReplicatedStorage.Library.Client.GUI)
 
 local Save = require(Library.Client.Save)
 local Signal = require(Library.Signal)
@@ -76,6 +85,7 @@ local RebirthCmds = require(Library.Client.RebirthCmds)
 local UltimateCmds = require(Library.Client.UltimateCmds)
 
 -- LocalScripts
+local RankUp = game.Players.LocalPlayer.PlayerScripts.Scripts.GUIs["Rank Up"]
 local AutoTapper = getsenv(LocalPlayer.PlayerScripts.Scripts.GUIs["Auto Tapper"])
 local EggAnim = getsenv(LocalPlayer.PlayerScripts.Scripts.Game["Egg Opening Frontend"])
 
@@ -87,6 +97,19 @@ for itemID, data in pairs(Save.Get().Inventory["Potion"]) do
     end
 end
 ]]
+--[[
+local namecall
+namecall = hookmetamethod(game, "__namecall", function(self, ...)
+    local method = getnamecallmethod():lower()
+
+    if method == "connect" and self.Name == "Ranks_RankUp" and getfenv(2).script == RankUp then
+        print("haha imagine")
+        return
+    else
+        return namecall(self, ...)
+    end
+end)
+]]
 
 -- Skip Egg EggAnim
 hookfunction(EggAnim.PlayEggAnimation, function()
@@ -97,6 +120,15 @@ end)
 hookfunction(require(Library.Client.PlayerPet).CalculateSpeedMultiplier, function()
     return 999
 end)
+--[[
+GUI.RankUp():GetPropertyChangedSignal("Enabled"):Connect(function(val)
+    if val then
+        GUI.RankUp().Enabled = false
+        TabController.Restore()
+        Variables.IsRankingUp = false
+    end
+end)
+]]
 
 -- Variables
 local CurrentlyFarming = true
@@ -196,9 +228,11 @@ local function autoTap(name)
         end
 
         for _, breakable in pairs(breakables) do
-            if string.find(breakable:GetAttribute("BreakableID"):lower(), name:lower()) and not string.find(breakable:GetAttribute("BreakableID"):lower(), "vip") then
-                return breakable:GetAttribute("BreakableUID")
-            end
+            pcall(function()
+                if string.find(breakable:GetAttribute("BreakableID"):lower(), name:lower()) and not string.find(breakable:GetAttribute("BreakableID"):lower(), "vip") then
+                    return breakable:GetAttribute("BreakableUID")
+                end
+            end)
         end
     end
 
@@ -270,7 +304,7 @@ QuestFunctions = {
             return table.insert(IgnoredQuests, parentFunc())
         end
         game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = workspace.__THINGS.Instances.SpawnObby.Teleports.Enter.CFrame
-        task.wait(12)
+        task.wait(9)
         game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = workspace.__THINGS.__INSTANCE_CONTAINER.Active.SpawnObby.Goal.Pad.CFrame
         NotificationCmds.Message.Bottom({Color=Color3.new(1, 1, 1), Message="Completed Spawn Obby"})
         task.wait(3)
@@ -280,21 +314,21 @@ QuestFunctions = {
             return table.insert(IgnoredQuests, parentFunc())
         end
         LocalPlayer.Character.HumanoidRootPart.CFrame = workspace.__THINGS.Instances.JungleObby.Teleports.Enter.CFrame
-        task.wait(12)
+        task.wait(9)
         LocalPlayer.Character.HumanoidRootPart.CFrame = workspace.__THINGS.__INSTANCE_CONTAINER.Active.JungleObby.Interactable.Goal.Pad.CFrame
         NotificationCmds.Message.Bottom({Color=Color3.new(1, 1, 1), Message="Completed Jungle Obby"})
         task.wait(5)
     end,
     ICE_OBBY = function()
         LocalPlayer.Character.HumanoidRootPart.CFrame = workspace.__THINGS.Instances.IceObby.Teleports.Enter.CFrame
-        task.wait(12)
+        task.wait(9)
         LocalPlayer.Character.HumanoidRootPart.CFrame = workspace.__THINGS.__INSTANCE_CONTAINER.Active.IceObby.Interactable.Goal.Pad.CFrame
         NotificationCmds.Message.Bottom({Color=Color3.new(1, 1, 1), Message="Completed Jungle Obby"})
         task.wait(3)
     end,
     PYRAMID_OBBY = function()
         LocalPlayer.Character.HumanoidRootPart.CFrame = workspace.__THINGS.Instances.PyramidObby.Teleports.Enter.CFrame
-        task.wait(12)
+        task.wait(9)
         LocalPlayer.Character.HumanoidRootPart.CFrame = workspace.__THINGS.__INSTANCE_CONTAINER.Active.PyramidObby.Interactable.Goal.Pad.CFrame
         NotificationCmds.Message.Bottom({Color=Color3.new(1, 1, 1), Message="Completed Pyramid Obby"})
         task.wait(3)
@@ -432,7 +466,7 @@ QuestFunctions = {
     
         LocalPlayer.Character.HumanoidRootPart.CFrame = MapUtil.GetZone(Zone)["INTERACT"]["BREAKABLE_SPAWNS"].Main.CFrame + Vector3.new(0, 5, 0)
     
-        while getQuest(num).Progress < getQuest(num).Amount do
+        repeat
             local item = getItem("Misc", "Basic Coin Jar")
     
             if not item then
@@ -443,7 +477,7 @@ QuestFunctions = {
             Network.CoinJar_Spawn:InvokeServer(item)
     
             task.wait(2)
-        end
+        until getQuest(num).Progress >= getQuest(num).Amount or getQuest(num).Name ~= parentFunc() and not getQuest(num).Name ~= "COIN_JAR" or not Config.AutoRank.Enabled or not AutoProgress
     
         NotificationCmds.Message.Bottom({Color=Color3.new(1, 1, 1), Message="Completed Best Coinjar"})
     end,
@@ -483,7 +517,7 @@ QuestFunctions = {
                 return NotificationCmds.Message.Bottom({Color=Color3.new(1, 1, 1), Message="Paused Diamond Pile"})
             end
 
-            task.wait(.5)
+            task.wait(1)
         until getQuest(num).Progress >= getQuest(num).Amount or getQuest(num).Name ~= cn
 
         autoTapper:Stop()
@@ -496,7 +530,7 @@ QuestFunctions = {
         --    DIAMOND_BREAKABLE(num)
         --else
         GlobalAutoTapper:Pause()
-        local autoTapper = autoTap(getQuest(num).CurrencyID)
+        local autoTapper = autoTap(string.sub(getQuest(num).CurrencyID, -1, 1))
         repeat
             task.wait(.1)
         until getQuest(num).Progress >= getQuest(num).Amount or not string.find(parentFunc(), getQuest(num).Name)
@@ -508,14 +542,40 @@ QuestFunctions = {
         NotificationCmds.Message.Bottom({Color=Color3.new(1, 1, 1), Message="Completed Currency"})
         --end
     end,
-    NON_BLOCKING_MINI_CHEST = function(num)
+    NON_BLOCKING_BREAKABLE = function(num)
+        GlobalAutoTapper:Pause()
+        local autoTapper
+        if string.find(getQuest(num).BreakableType:lower(), "safe") then
+            autoTapper = autoTap("safe")
+        else
+            autoTapper = autoTap(getQuest(num).BreakableType)
+        end
         repeat
             task.wait(.1)
         until getQuest(num).Progress >= getQuest(num).Amount or not string.find(parentFunc(), getQuest(num).Name)
+
+        autoTapper:Stop()
+        GlobalAutoTapper:Resume()
+
+        table.remove(CurrentNonBlocking, table.find(CurrentNonBlocking, parentFunc()))
+        NotificationCmds.Message.Bottom({Color=Color3.new(1, 1, 1), Message="Completed Currency"})
+        --end
+    end,
+    NON_BLOCKING_BEST_MINI_CHEST = function(num)
+        GlobalAutoTapper:Pause()
+        local autoTapper = autoTap("minichest")
+        repeat
+            task.wait(.1)
+        until getQuest(num).Progress >= getQuest(num).Amount or not string.find(parentFunc(), getQuest(num).Name)
+
+        autoTapper:Stop()
+        GlobalAutoTapper:Resume()
     
         table.remove(CurrentNonBlocking, table.find(CurrentNonBlocking, parentFunc()))
-    
-        NotificationCmds.Message.Bottom({Color=Color3.new(1, 1, 1), Message="Completed Mini Chest"})
+        NotificationCmds.Message.Bottom({Color=Color3.new(1, 1, 1), Message="Completed Best Mini Chest"})
+    end,
+    NON_BLOCKING_MINI_CHEST = function(num)
+        QuestFunctions.NON_BLOCKING_BEST_MINI_CHEST(num)
     end,
     NON_BLOCKING_USE_FLAG = function(num)
         local ZoneName = MapCmds.GetCurrentZone()
@@ -571,22 +631,26 @@ QuestFunctions = {
         NotificationCmds.Message.Bottom({Color=Color3.new(1, 1, 1), Message="Completed Use Potion"})
     end,
     NON_BLOCKING_COLLECT_POTION = function(num)
+        table.insert(IgnoredQuests, "COLLECT_POTION")
+        --[[
         local _, zoneData = ZoneCmds.GetMaxOwnedZone()
         for i = 2, zoneData.ZoneNumber do
             local Zone = TeleportToZone(ZonesUtil.GetZoneFromNumber(i))
             if Zone:FindFirstChild("INTERACT"):FindFirstChild("Machines") then
                 for _, machine in pairs(Zone:FindFirstChild("INTERACT"):FindFirstChild("Machines"):GetChildren()) do
-                    local machineModule = require(Directory["VendingMachine"..machine.Name])
+                    if Directory.VendingMachines:FindFirstChild("VendingMachine | "..machine.Name) then
+                        local machineModule = require(Directory.VendingMachines["VendingMachine | "..machine.Name])
 
-                    if machineModule.Stock > 0 then
-                        LocalPlayer.Character.Humanoid.CFrame = machine.Pad.CFrame + Vector3.new(0, 2, 0)
-                        repeat
-                            Network.VendingMachines_Purchase:InvokeServer(machine.MachineName, 1)
-                            task.wait(.5)
-                        until machine.Stock <= 0 or getQuest(num).Progress >= getQuest(num).Amount or not string.find(parentFunc(), getQuest(num).Name) or not Config.AutoRank.Enabled or not AutoProgress
+                        if machineModule.Stock > 0 then
+                            LocalPlayer.Character.HumanoidRootPart.CFrame = machine.Pad.CFrame + Vector3.new(0, 2, 0)
+                            repeat
+                                Network.VendingMachines_Purchase:InvokeServer(machineModule.MachineName, 1)
+                                task.wait(.5)
+                            until machineModule.Stock <= 0 or getQuest(num).Progress >= getQuest(num).Amount or not string.find(parentFunc(), getQuest(num).Name) or not Config.AutoRank.Enabled or not AutoProgress
 
-                        if getQuest(num).Progress >= getQuest(num).Amount or not string.find(parentFunc(), getQuest(num).Name) or not Config.AutoRank.Enabled or not AutoProgress then
-                            break
+                            if getQuest(num).Progress >= getQuest(num).Amount or not string.find(parentFunc(), getQuest(num).Name) or not Config.AutoRank.Enabled or not AutoProgress then
+                                break
+                            end
                         end
                     end
                 end
@@ -602,6 +666,7 @@ QuestFunctions = {
         table.remove(CurrentNonBlocking, table.find(CurrentNonBlocking, parentFunc()))
 
         NotificationCmds.Message.Bottom({Color=Color3.new(1, 1, 1), Message="Completed Collect Potion"})
+        ]]
     end,
     NON_BLOCKING_COLLECT_ENCHANT = function(num) -- IGNORED
         table.insert(IgnoredQuests, "COLLET_ENCHANT")
@@ -659,6 +724,37 @@ local function numberSuffix(number)
     return tostring(number..suffix)
 end
 
+if Config.Performance.SimpleFpsBooster then
+    if workspace:FindFirstChild("ALWAYS_RENDERING") then
+        workspace.ALWAYS_RENDERING:ClearAllChildren()
+    end
+
+    for _, zone in pairs(WorldsUtil.GetMap():GetChildren()) do
+        if zone.PARTS_LOD:FindFirstChild("WALLS") then
+            zone.PARTS_LOD:ClearAllChildren()
+        end
+    
+        if zone:FindFirstChild("PARTS") then
+            zone.PARTS:ClearAllChildren()
+        end
+    
+        zone.DescendantAdded:Connect(function(desc)
+            task.wait()
+            pcall(function()
+                if desc:IsDescendantOf(zone:FindFirstChild("PARTS")) then
+                    zone.PARTS:Destroy()
+                end
+            end)
+    
+            pcall(function()
+                if desc:IsDescendantOf(zone.PARTS_LOD:FindFirstChild("WALLS")) then
+                    zone.PARTS_LOD.WALLS:Destroy()
+                end
+            end)
+        end)
+    end
+end
+
 -- Auto World 
 task.spawn(function()
     if Config.AutoWorld.Enabled then
@@ -679,17 +775,18 @@ task.spawn(function()
             NotificationCmds.Message.Bottom({Color=Color3.new(1, 1, 1), Message="New Zone Unlocked!"}) -- [10/239]
 
             if Config.PurchasePetSlots then
-                if Save.Get().PetSlotsPurchased < RankCmds.GetMaxPurchasableEquipSlots() and not Variables.IsRankingUp and WorldsUtil.GetWorldNumber() == 1 then
-                    local Zone = TeleportToZone("Green Forest")
-                    LocalPlayer.Character.HumanoidRootPart.Anchored = true
-                    LocalPlayer.Character.HumanoidRootPart.CFrame = Zone.INTERACT.Machines.EquipSlotsMachine.Pad.CFrame
+                if Save.Get().PetSlotsPurchased < RankCmds.GetMaxPurchasableEquipSlots() and not Variables.IsRankingUp then--and WorldsUtil.GetWorldNumber() == 1 then
+                    --local Zone = TeleportToZone("Green Forest")
+                    --LocalPlayer.Character.HumanoidRootPart.Anchored = true
+                    --LocalPlayer.Character.HumanoidRootPart.CFrame = Zone.INTERACT.Machines.EquipSlotsMachine.Pad.CFrame
 
-                    for n = Save.Get().PetSlotsPurchased,  RankCmds.GetMaxPurchasableEquipSlots() do
+                    for n = Save.Get().PetSlotsPurchased, RankCmds.GetMaxPurchasableEquipSlots() do
                         task.wait(1)
                         Network.EquipSlotsMachine_RequestPurchase:InvokeServer(n)
+                        NotificationCmds.Message.Bottom({Color=Color3.new(1, 1, 1), Message=numberSuffix(n).." Pet Slot Unlocked!"})
                     end
 
-                    LocalPlayer.Character.HumanoidRootPart.Anchored = false
+                    --LocalPlayer.Character.HumanoidRootPart.Anchored = false
                 end
             end
 
@@ -697,7 +794,7 @@ task.spawn(function()
 
             task.wait(1)
 
-            if Config.UseTntOnNewZone and (not Config.SmartTnt or ZoneData.ZoneNumber >= SmartTntConfig[RebirthCmds.Get()].Min and ZoneData.ZoneNumber <= SmartTntConfig[RebirthCmds.Get()].Max) then
+            if Config.AutoWorld.UseTntOnNewZone and (not Config.AutoWorld.SmartTnt or ZoneData.ZoneNumber >= SmartTntConfig[RebirthCmds.Get()].Min and ZoneData.ZoneNumber <= SmartTntConfig[RebirthCmds.Get()].Max) then
                 ConsumedTNT = ConsumedTNT + 1
                 NotificationCmds.Message.Bottom({Color=Color3.new(1, 1, 1), Message="Consuming "..numberSuffix(ConsumedTNT).." TNT"})
                 Network.TNT_Crate_Consume:InvokeServer()
@@ -710,6 +807,19 @@ task.spawn(function()
             end
             task.wait(1)
         end
+    end
+end)
+
+-- TNT Interval
+task.spawn(function()
+    while AutoProgress and Config.AutoWorld.UseTntOnDelay do
+        repeat task.wait() until CurrentlyFarming
+
+        ConsumedTNT = ConsumedTNT + 1
+        NotificationCmds.Message.Bottom({Color=Color3.new(1, 1, 1), Message="Consuming "..numberSuffix(ConsumedTNT).." TNT"})
+        Network.TNT_Crate_Consume:InvokeServer()
+
+        task.wait(Config.AutoWorld.TntDelay)
     end
 end)
 
@@ -797,15 +907,16 @@ task.spawn(function()
     end
 end)
 
+task.wait(4)
+
 -- Auto Rank
 task.spawn(function()
     local dqt = {}
-    local IgnoredQuests = {}
 
     local function checkQuest(quest)
-        if QuestFunctions["NON_BLOCKING_"..quest] and not table.find(IgnoredQuests, quest.Name) and not table.find(dqt, quest.Name) and not table.find(CurrentNonBlocking, quest.Name) and not Variables.IsRankingUp then
+        if QuestFunctions["NON_BLOCKING_"..quest] and not table.find(IgnoredQuests, quest) and not table.find(dqt, quest) and not table.find(CurrentNonBlocking, quest) and not Variables.IsRankingUp then
             return "NON_BLOCKING", QuestFunctions["NON_BLOCKING_"..quest]
-        elseif QuestFunctions[quest] and not table.find(IgnoredQuests, quest.Name) and not table.find(dqt, quest.Name) and #CurrentNonBlocking == 0 and not Variables.IsRankingUp then
+        elseif QuestFunctions[quest] and not table.find(IgnoredQuests, quest) and not table.find(dqt, quest) and #CurrentNonBlocking == 0 and not Variables.IsRankingUp then
             return "BLOCKING", QuestFunctions[quest]
         end
     end
@@ -826,15 +937,25 @@ task.spawn(function()
             Network.Ranks_RankUp:FireServer()
         end
 
+        table.clear(dqt)
+        for i, v in ipairs(DelayedQuests) do
+            if v.Time >= tick() then
+                table.remove(DelayedQuests, i)
+            else
+                table.insert(dqt, v.Quest)
+            end
+        end
+
         for i, data in pairs(getQuests()) do
             local quest = getQuest(i)
             for i, v in pairs(quest) do print(i, v) end
             local check, questFunc = checkQuest(quest.Name) 
             if check and check == "NON_BLOCKING" then
                 print("[STARTING] NON BLOCKING "..quest.Name)
-                CurrentlyFarming = false
+                --CurrentlyFarming = false
                 NotificationCmds.Message.Bottom({Color=Color3.new(1, 1, 1), Message="Starting "..quest.Name})
                 questFunc(i)
+                --CurrentlyFarming = true
             elseif check and check == "BLOCKING" then
                 print("[STARTING] BLOCKING "..quest.Name)
                 NotificationCmds.Message.Bottom({Color=Color3.new(1, 1, 1), Message="Starting "..quest.Name})
@@ -845,7 +966,7 @@ task.spawn(function()
                 CurrentlyFarming = true
                 --NotificationCmds.Message.Bottom({Color=Color3.new(1, 1, 1), Message="Completed "..quest.Name})
             else
-                warn("Skipping "..quest.Name)
+                warn("[SKIPPING] "..quest.Name)
                 NotificationCmds.Message.Bottom({Color=Color3.new(1, 0.917647, 0.447058), Message="Skipping "..quest.Name})
             end
         end
