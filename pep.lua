@@ -19,7 +19,7 @@ getgenv().Config = {
     },
     Performance = {
         SetFpsCap = 999,
-        Disable3dRendering = true,
+        Disable3dRendering = false,
         SimpleFpsBooster = true,
     }
 }
