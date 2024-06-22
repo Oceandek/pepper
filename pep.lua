@@ -10,12 +10,23 @@ getgenv().Config = {
         TntDelay = 10,
         SmartTnt = false,
         UseTntOnNewZone = false,
+        IgnoredQuests = {"DIAMOND_BREAKABLE"}
     },
     AutoRank = {
         Enabled = true,
         InitialRank = 10, -- Rank up to rank n before/during Auto World, false to skip.
         Flags = {"Magnet Flag", "Coins Flag", "Hasty Flag", "Magnet Flag", "Diamonds Flag"}, -- Flags to use for USE_FLAG quest
         Potions = {"Damage", "Coins", "Egg", "Speed", "Diamonds", "Treasure Hunter"} -- Potions to use for USE_POTION quest
+    },
+    Webhooks = {
+        Statistics = {
+            Enabled = true,
+            Delay = 60,
+            WebhookUrl = ""
+        },
+    },
+    Misc = {
+        ClaimFreeRewards = true
     },
     Performance = {
         SetFpsCap = 999,
@@ -73,6 +84,7 @@ local ZonesUtil = require(Library.Util.ZonesUtil)
 
 -- Cmds
 local ZoneCmds = require(Library.Client.ZoneCmds)
+local CurrencyCmds = require(Library.Client.CurrencyCmds)
 local MasteryCmds = require(Library.Client.MasteryCmds)
 local FlagCmds = require(Library.Client.ZoneFlagCmds)
 local PotionCmds = require(Library.Client.PotionCmds)
@@ -138,7 +150,7 @@ local ConsumedTNT = 0
 local OldZone = nil
 local Quests = {}
 local DelayedQuests = {}
-local IgnoredQuests = {}
+local IgnoredQuests = Config.AutoRank.IgnoredQuests
 
 for i, v in pairs(require(Library.Types.Quests)["Goals"]) do
     Quests[v] = i
@@ -514,6 +526,7 @@ QuestFunctions = {
 
             if ZoneNumber >= MaxZoneData.ZoneNumber then
                 table.insert(DelayedQuests, {Quest = parentFunc(), Time = tick() + 120})
+                warn("Paused Diamond Pile")
                 return NotificationCmds.Message.Bottom({Color=Color3.new(1, 1, 1), Message="Paused Diamond Pile"})
             end
 
@@ -729,29 +742,35 @@ if Config.Performance.SimpleFpsBooster then
         workspace.ALWAYS_RENDERING:ClearAllChildren()
     end
 
+    if workspace:FindFirstChild("ALWAYS_RENDERING_2") then
+        workspace.ALWAYS_RENDERING_2:ClearAllChildren()
+    end
+
     for _, zone in pairs(WorldsUtil.GetMap():GetChildren()) do
-        if zone.PARTS_LOD:FindFirstChild("WALLS") then
-            zone.PARTS_LOD:ClearAllChildren()
-        end
-    
-        if zone:FindFirstChild("PARTS") then
-            zone.PARTS:ClearAllChildren()
-        end
-    
-        zone.DescendantAdded:Connect(function(desc)
-            task.wait()
-            pcall(function()
-                if desc:IsDescendantOf(zone:FindFirstChild("PARTS")) then
-                    zone.PARTS:Destroy()
-                end
+        if zone.Name ~= "SHOP" then
+            if zone.PARTS_LOD:FindFirstChild("WALLS") then
+                zone.PARTS_LOD:ClearAllChildren()
+            end
+        
+            if zone:FindFirstChild("PARTS") then
+                zone.PARTS:ClearAllChildren()
+            end
+        
+            zone.DescendantAdded:Connect(function(desc)
+                task.wait()
+                pcall(function()
+                    if desc:IsDescendantOf(zone:FindFirstChild("PARTS")) then
+                        zone.PARTS:Destroy()
+                    end
+                end)
+        
+                pcall(function()
+                    if desc:IsDescendantOf(zone.PARTS_LOD:FindFirstChild("WALLS")) then
+                        zone.PARTS_LOD.WALLS:Destroy()
+                    end
+                end)
             end)
-    
-            pcall(function()
-                if desc:IsDescendantOf(zone.PARTS_LOD:FindFirstChild("WALLS")) then
-                    zone.PARTS_LOD.WALLS:Destroy()
-                end
-            end)
-        end)
+        end
     end
 end
 
@@ -774,7 +793,7 @@ task.spawn(function()
 
             NotificationCmds.Message.Bottom({Color=Color3.new(1, 1, 1), Message="New Zone Unlocked!"}) -- [10/239]
 
-            if Config.PurchasePetSlots then
+            if Config.AutoWorld.PurchasePetSlots then
                 if Save.Get().PetSlotsPurchased < RankCmds.GetMaxPurchasableEquipSlots() and not Variables.IsRankingUp then--and WorldsUtil.GetWorldNumber() == 1 then
                     --local Zone = TeleportToZone("Green Forest")
                     --LocalPlayer.Character.HumanoidRootPart.Anchored = true
@@ -909,6 +928,38 @@ end)
 
 task.wait(4)
 
+-- Statistics
+task.spawn(function()
+    while Config.Webhooks.Statistics.Enabled do
+        task.wait(Config.Webhooks.Statistics.Delay)
+        local data = {
+            ["username"] =  "webhook thingie",
+            ["avatar_url"] = "https://cdn.discordapp.com/avatars/593552251939979275/58ea82801d6003749293c7bba1efabc8.webp?size=1024&format=webp&width=0&height=256",
+            ["content"] = "",
+            ["embeds"] = {
+                {
+                    ["author"] = {
+                        ["name"] = game.Players.LocalPlayer.Name,
+                        ["url"] = "https://www.roblox.com/users/" ..game.Players.LocalPlayer.UserId,
+                        ["icon_url"] = HttpService:JSONDecode(request({Url = "https://thumbnails.roblox.com/v1/users/avatar-bust?userIds=" .. game.Players.LocalPlayer.UserId .. "&size=420x420&format=Png&isCircular=false", Method = "GET", Headers = {["Content-Type"] = "application/json"}}).Body).data[1].imageUrl,
+                    },
+                    ["title"] = "Pet Simulator 99 ("..Config.Webhooks.Statistics.Delay.."s)",
+                    ["color"] = 0x212325,
+                    ["thumbnail"] = {
+                        ["url"] = "https://cdn.discordapp.com/attachments/1213966172932939816/1252329987114139758/6ocaKOJ.png?ex=6671d2b0&is=66708130&hm=c3792d7e1c5b7cb4db88b20aeb8922f9c448510b591ec486a885b9ce3a1e582f&"
+                    },
+                    ["footer"] = {
+                        ["text"] = "00:00:007 - Wave 8 - Foosha Village"
+                    }
+                },
+            },
+            ['timestamp'] = DateTime(),
+        }
+
+        request({Url = Config.Webhooks.Statistics.WebhookUrl, Method = "POST", Headers = {["Content-Type"] = "application/json"}, Body = HttpService:JSONEncode(data)})
+    end
+end)
+
 -- Auto Rank
 task.spawn(function()
     local dqt = {}
@@ -972,3 +1023,114 @@ task.spawn(function()
         end
     end
 end)
+
+if true == false then
+    function numberToRoman(num)
+        local roman = ""
+        local romanNumberMap = {
+            {1000, 'M'},
+            {900, 'CM'},
+            {500, 'D'},
+            {400, 'CD'},
+            {100, 'C'},
+            {90, 'XC'},
+            {50, 'L'},
+            {40, 'XL'},
+            {10, 'X'},
+            {9, 'IX'},
+            {5, 'V'},
+            {4, 'IV'},
+            {1, 'I'}
+            
+        }
+        while num > 0 do
+            for index,v in pairs(romanNumberMap)do 
+                local romanChar = v[2]
+                local int = v[1]
+                while num >= int do
+                    roman = roman..romanChar
+                    num = num - int
+                end
+            end
+        end
+        return roman
+    end
+    
+    local function convertToComma(Number, PositiveSign)
+        local formatted, k = Number
+        while true do  
+            formatted, k = string.gsub(formatted, "^(-?%d+)(%d%d%d)", '%1,%2')
+            if (k==0) then
+                break
+            end
+        end
+        if PositiveSign then
+            if Number > 0 then
+                return "+"..formatted
+            end
+        end
+        
+        return formatted
+    end
+    
+    function formatTime(Seconds, fullhms)
+        local function format(num)
+            return string.format("%02i", num)
+        end
+    
+        local Minutes = (Seconds - Seconds%60)/60
+        Seconds = Seconds - Minutes*60
+        local Hours = (Minutes - Minutes%60)/60
+        Minutes = Minutes - Hours*60
+        if not fullhms and Hours == 0 then
+            return format(Minutes)..":"..format(Seconds)
+        else
+            return format(Hours)..":"..format(Minutes)..":"..format(Seconds)
+        end
+    end
+    
+    local activePotionsFormatted = ""
+    
+    for potionType, data in pairs(PotionCmds.GetActivePotions()) do
+        for val, time in pairs(data) do
+            print(potionType, val, time)
+            activePotionsFormatted = activePotionsFormatted..potionType.." Potion "..numberToRoman(val).." ("..formatTime(time)..")".."\n"
+        end
+    end
+    
+    local data = {
+        ["username"] =  "webhook thingie",
+        ["avatar_url"] = "https://cdn.discordapp.com/avatars/593552251939979275/58ea82801d6003749293c7bba1efabc8.webp?size=1024&format=webp&width=0&height=256",
+        ["content"] = "",
+        ["embeds"] = {
+            {
+                ["author"] = {
+                    ["name"] = game.Players.LocalPlayer.Name,
+                    ["url"] = "https://www.roblox.com/users/" ..game.Players.LocalPlayer.UserId,
+                    ["icon_url"] = HttpService:JSONDecode(request({Url = "https://thumbnails.roblox.com/v1/users/avatar-bust?userIds=" .. game.Players.LocalPlayer.UserId .. "&size=420x420&format=Png&isCircular=false", Method = "GET", Headers = {["Content-Type"] = "application/json"}}).Body).data[1].imageUrl,
+                },
+                ["title"] = "Pet Simulator 99 ("..Config.Webhooks.Statistics.Delay.."s)",
+                ["color"] = 0x212325,
+                ["description"] =  [[
+    <:Gems:1114627263808421919>  **Diamonds**
+     ```
+    ]]..convertToComma(CurrencyCmds.Get("Diamonds"))..[[
+    ```
+    
+    <:Potion:1239350598298505217> **Boosts**
+    ```]]..activePotionsFormatted..
+    [[```
+                ]],
+                ["thumbnail"] = {
+                    ["url"] = "https://cdn.discordapp.com/attachments/1213966172932939816/1252329987114139758/6ocaKOJ.png?ex=6671d2b0&is=66708130&hm=c3792d7e1c5b7cb4db88b20aeb8922f9c448510b591ec486a885b9ce3a1e582f&"
+                },
+                ["footer"] = {
+                    ["text"] = "00:00:00 - World "..WorldsUtil.GetWorldNumber().." - Zone X (XYZ)"
+                }
+            },
+        },
+        --['timestamp'] = DateTime(),
+    }
+    
+    request({Url = Config.Webhooks.Statistics.WebhookUrl, Method = "POST", Headers = {["Content-Type"] = "application/json"}, Body = HttpService:JSONEncode(data)})
+end
