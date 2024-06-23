@@ -222,10 +222,12 @@ QuestFunctions = {
                 if amt and Hatched >= amt and nonExplicit then
                     break
                 end
-                for _, data in pairs(Save.Get().Inventory.Pet) do
-                    if data._am ~= nil and data._am >= amt and data.pt == nil then
-                        cAmt = true
-                        NotificationCmds.Message.Bottom({Color=Color3.new(1, 1, 1), Message="Finished Hatching Eggs"})
+                if amt then
+                    for _, data in pairs(Save.Get().Inventory.Pet) do
+                        if data._am ~= nil and data._am >= amt and data.pt == nil then
+                            cAmt = true
+                            NotificationCmds.Message.Bottom({Color=Color3.new(1, 1, 1), Message="Finished Hatching Eggs"})
+                        end
                     end
                 end
             end
