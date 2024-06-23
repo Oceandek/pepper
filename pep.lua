@@ -219,7 +219,7 @@ QuestFunctions = {
             local success = Network.CustomEggs_Hatch:InvokeServer(EggId, Save.Get().EggHatchCount)
             if success then
                 Hatched += Save.Get().EggHatchCount
-                if Hatched >= amt and nonExplicit then
+                if amt and Hatched >= amt and nonExplicit then
                     break
                 end
                 for _, data in pairs(Save.Get().Inventory.Pet) do
