@@ -229,7 +229,7 @@ QuestFunctions = {
                     end
                 end
             end
-        until amt and cAmt or not amt and (not getQuest() or not getQuest().Name == parentFunc() or getQuest().Progress >= getQuest.Amount)
+        until amt and cAmt or not amt and (not getQuest() or not getQuest().Name == parentFunc() or getQuest().Progress >= getQuest().Amount)
     end,
     GOLD_PET = function(amt)
         LocalPlayer.Character.HumanoidRootPart.CFrame = workspace.__THINGS.__INSTANCE_CONTAINER.Active.GoodEvilInstance.INTERACT.Machines.GoldMachine.Pad.CFrame
