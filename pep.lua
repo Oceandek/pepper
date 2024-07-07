@@ -1,37 +1,38 @@
 getgenv().AutoProgress = false
 --task.wait(2)
-getgenv().AutoProgress = true
+getgenv().AutoProgress = true -- ✅
 getgenv().Config = {
     AutoWorld = {
-        Enabled = true,
-        PurchasePetSlots = true,
-        AutoTap = true,
+        Enabled = true, -- ✅
+        PurchasePetSlots = true, -- ✅
+        AutoTap = true, -- ✅
         UseTntOnDelay = false, -- Use tnt on set intervals, does not respect SmartTnt
-        TntDelay = 10,
-        SmartTnt = false,
-        UseTntOnNewZone = false,
-        IgnoredQuests = {"DIAMOND_BREAKABLE"}
+        TntDelay = 10, -- 🟨
+        SmartTnt = false, -- 🟨
+        UseTntOnNewZone = false, -- 🟨
+        FarmUnderMap = true,
     },
     AutoRank = {
-        Enabled = true,
-        InitialRank = 10, -- Rank up to rank n before/during Auto World, false to skip.
-        Flags = {"Magnet Flag", "Coins Flag", "Hasty Flag", "Magnet Flag", "Diamonds Flag"}, -- Flags to use for USE_FLAG quest
-        Potions = {"Damage", "Coins", "Egg", "Speed", "Diamonds", "Treasure Hunter"} -- Potions to use for USE_POTION quest
+        Enabled = false, -- ✅
+        InitialRank = 10, -- Rank up to rank n before/during Auto World, false to skip. ✅
+        IgnoredQuests = {"DIAMOND_BREAKABLE"}, -- ✅
+        Flags = {"Magnet Flag", "Coins Flag", "Hasty Flag", "Magnet Flag", "Diamonds Flag"}, -- Flags to use for USE_FLAG quest ✅
+        Potions = {"Damage", "Coins", "Egg", "Speed", "Diamonds", "Treasure Hunter"} -- Potions to use for USE_POTION quest ✅
     },
-    Webhooks = {
+    Webhooks = { -- ❌
         Statistics = {
-            Enabled = true,
+            Enabled = false,
             Delay = 60,
             WebhookUrl = ""
         },
     },
     Misc = {
-        ClaimFreeRewards = true
+        ClaimFreeRewards = true -- ❌
     },
     Performance = {
-        SetFpsCap = 999,
-        Disable3dRendering = false,
-        SimpleFpsBooster = true,
+        SetFpsCap = 999, -- ✅
+        Disable3dRendering = false, -- ✅
+        --SimpleFpsBooster = true, ❌
     }
 }
 getgenv().SmartTntConfig = {
@@ -52,6 +53,8 @@ getgenv().SmartTntConfig = {
         Min = 75
     }
 }
+
+game.Players.LocalPlayer.Character.HumanoidRootPart.Anchored = false
 
 setfpscap(Config.Performance.SetFpsCap)
 game:GetService("RunService"):Set3dRenderingEnabled((not Config.Performance.Disable3dRendering))
@@ -123,15 +126,6 @@ namecall = hookmetamethod(game, "__namecall", function(self, ...)
 end)
 ]]
 
--- Skip Egg EggAnim
-hookfunction(EggAnim.PlayEggAnimation, function()
-    return
-end)
-
--- Infinite Pet Speed
-hookfunction(require(Library.Client.PlayerPet).CalculateSpeedMultiplier, function()
-    return 999
-end)
 --[[
 GUI.RankUp():GetPropertyChangedSignal("Enabled"):Connect(function(val)
     if val then
@@ -151,10 +145,39 @@ local OldZone = nil
 local Quests = {}
 local DelayedQuests = {}
 local IgnoredQuests = Config.AutoRank.IgnoredQuests
+local CurrentZone = MapCmds.GetCurrentZone()
 
 for i, v in pairs(require(Library.Types.Quests)["Goals"]) do
     Quests[v] = i
 end
+
+-- Anti Afk
+for i, v in pairs(getconnections(game.Players.LocalPlayer.Idled)) do
+    v:Disable()
+end
+
+local vu = game:GetService("VirtualUser")
+game:GetService("Players").LocalPlayer.Idled:Connect(function()
+   vu:Button2Down(Vector2.new(0,0),workspace.CurrentCamera.CFrame)
+   task.wait(1)
+   vu:Button2Up(Vector2.new(0,0),workspace.CurrentCamera.CFrame)
+end)
+
+-- Skip Egg EggAnim
+hookfunction(EggAnim.PlayEggAnimation, function()
+    return
+end)
+
+-- Infinite Pet Speed
+hookfunction(require(Library.Client.PlayerPet).CalculateSpeedMultiplier, function()
+    return 999
+end)
+
+-- Hook MapCmds.GetCurrentZone
+hookfunction(MapCmds.GetCurrentZone, function()
+    return CurrentZone
+end)
+
 
 local function parentFunc()
     local info = debug.getinfo(2, "n")
@@ -169,7 +192,27 @@ local function getQuests()
     return Save.Get()["Goals"]
 end
 
+local function getZoneQuest()
+    local quest, questActive = {}, Save.Get().ZoneGateQuest
+
+    if not questActive then
+        return
+    end
+
+    for i, v in pairs(questActive) do
+        quest[i] = v
+    end
+
+    quest["Name"] = Quests[quest.Type]
+
+    return quest
+end
+
 local function getQuest(num)
+    if WorldsUtil.GetWorldNumber() == 3 then
+        return getZoneQuest()
+    end
+
     if not num then
         return warn("Missing Quest Number")
     end
@@ -214,6 +257,10 @@ local function getItems(class, filter: table? | string?)
     end
 
     return items
+end
+
+local function SetCurrentZone(zone)
+    
 end
 
 local function autoTap(name)
@@ -285,8 +332,10 @@ local function autoUltimate()
         while ultimate do
             local UltimateItem = UltimateCmds.GetEquippedItem()
 
-            if UltimateCmds.IsCharged(UltimateItem:GetId()) then
+            if UltimateItem and UltimateCmds.IsCharged(UltimateItem:GetId()) then
                 UltimateCmds.Activate(UltimateItem:GetId())
+            elseif not UltimateItem then
+                break
             end
 
             task.wait(1)
@@ -304,16 +353,39 @@ local function TeleportToZone(name, data)
     end
 
     if typeof(name) == "string" then
+        print("is string")
         Zone = MapUtil.GetZone(name)
     end
 
-    print(name, Zone)
+    print("[TELEPORT]", name, Zone)
+    CurrentZone = name
+    MapCmds.ZoneChanged:FireAsync(name)
 
-    LocalPlayer:RequestStreamAroundAsync(Zone["PERSISTENT"]:FindFirstChild("Teleport").Position or Zone["PERSISTENT"]:GetChildren()[1].Position)
+    if Zone:FindFirstChild("PERSISTENT") then
+        LocalPlayer:RequestStreamAroundAsync(Zone["PERSISTENT"]:FindFirstChild("Teleport").Position or Zone["PERSISTENT"]:GetChildren()[1].Position)
+    end
 
     local i = 0
-    repeat i = i + 1 until string.find(Zone:WaitForChild("INTERACT")["BREAKABLE_SPAWNS"]:GetChildren()[i].Name, "Main")
-    LocalPlayer.Character.HumanoidRootPart.CFrame = Zone:WaitForChild("INTERACT"):WaitForChild("BREAKABLE_SPAWNS"):GetChildren()[i].CFrame --+ Vector3.new(0, 5, 0)
+    repeat i = i + 1 task.wait() until string.find(Zone:WaitForChild("INTERACT")["BREAKABLE_SPAWNS"]:GetChildren()[i].Name, "Main")
+
+    if not Zone:FindFirstChild("UndergroundPart") then
+        local part = Instance.new("Part", Zone)
+        part.Anchored = true
+        part.Name = "UndergroundPart"
+        part.Size = Vector3.new(10, 1, 10)
+        part.Position = Zone:WaitForChild("INTERACT").BREAK_ZONES.BREAK_ZONE.Position - Vector3.new(0, Zone:WaitForChild("INTERACT").BREAK_ZONES.BREAK_ZONE.Position.Y - 2, 0)
+        if Zone:WaitForChild("INTERACT").BREAK_ZONES:FindFirstChild("BREAK_ZONE") then
+            Zone:WaitForChild("PARTS_LOD").GROUND:Destroy()
+            Zone.INTERACT.BREAK_ZONES.BREAK_ZONE.Position = part.Position + Vector3.new(0, 4, 0)
+        end
+    end
+
+    --if Zone:WaitForChild("INTERACT").BREAK_ZONES.BREAK_ZONE.CFrame.Position.Y ~= 5 then
+    --    Zone:WaitForChild("INTERACT").BREAK_ZONES.BREAK_ZONE.Position -= Vector3.new(0, Zone:WaitForChild("INTERACT").BREAK_ZONES.BREAK_ZONE.Position.Y + 5, 0)
+    --end
+
+    --LocalPlayer.Character.HumanoidRootPart.CFrame = Zone:WaitForChild("INTERACT").BREAK_ZONES.BREAK_ZONE.CFrame
+    LocalPlayer.Character.HumanoidRootPart.CFrame = Zone.UndergroundPart.CFrame + Vector3.new(0, 3, 0)
 
     return Zone
 end
@@ -469,7 +541,7 @@ QuestFunctions = {
         repeat Network.Eggs_RequestPurchase:InvokeServer(EggId, HatchCount) task.wait(.2) until getQuest(num).Progress >= getQuest(num).Amount or getQuest(num).Name ~= parentFunc() and not getQuest(num).Name ~= "EGG" or not Config.AutoRank.Enabled or not AutoProgress
         --print(getQuest(num).Name,":", parentFunc())
     
-        Players.LocalPlayer.Character.HumanoidRootPart.Anchored = false
+        --Players.LocalPlayer.Character.HumanoidRootPart.Anchored = false
         NotificationCmds.Message.Bottom({Color=Color3.new(1, 1, 1), Message="Completed Egg Quest"})
     end,
     EGG = function(num) -- Temporary
@@ -546,6 +618,48 @@ QuestFunctions = {
 
         NotificationCmds.Message.Bottom({Color=Color3.new(1, 1, 1), Message="Completed Diamond Pile"})
     end,
+    --[[
+    GOLD_PET = function(amt) -- UNTESTED
+        LocalPlayer.Character.HumanoidRootPart.CFrame = workspace.__THINGS.__INSTANCE_CONTAINER.Active.GoodEvilInstance.INTERACT.Machines.GoldMachine.Pad.CFrame
+        local uid
+        for id, data in pairs(Save.Get().Inventory.Pet) do
+            if data._am ~= nil and data._am >= 10 and data.pt == nil then
+                uid = id
+                break
+            end
+        end
+
+        if uid and math.floor(Save.Get().Inventory.Pet[uid]._am / 10) > 0 then
+            NotificationCmds.Message.Bottom({Color=Color3.new(1, 1, 1), Message="Turned "..(math.floor(Save.Get().Inventory.Pet[uid]._am / 10) * 10).."x "..Save.Get().Inventory.Pet[uid].id.." into gold"})
+
+            NetworkModule.Invoke("GoldMachine_Activate", uid, math.floor(Save.Get().Inventory.Pet[uid]._am / 10))
+        else
+            NotificationCmds.Message.Bottom({Color=Color3.fromRGB(255, 90, 90), Message="No Eligible Pet Found"})
+            NotificationCmds.Message.Bottom({Color=Color3.new(1, 1, 1), Message="Hatching Eggs"})
+            QuestFunctions["EGG"](((amt or (getQuest().Amount - getQuest().Progress)) * 10))
+        end
+    end,
+    RAINBOW_PET = function() -- UNTESTED
+        LocalPlayer.Character.HumanoidRootPart.CFrame = workspace.__THINGS.__INSTANCE_CONTAINER.Active.GoodEvilInstance.INTERACT.Machines.RainbowMachine.Pad.CFrame
+        local uid
+        for id, data in pairs(Save.Get().Inventory.Pet) do
+            if data._am ~= nil and data._am >= 10 and data.pt ~= nil and data.pt == 1 then
+                uid = id
+                break
+            end
+        end
+
+        if uid and math.floor(Save.Get().Inventory.Pet[uid]._am / 10) > 0 then
+            NotificationCmds.Message.Bottom({Color=Color3.new(1, 1, 1), Message="Turned "..(math.floor(Save.Get().Inventory.Pet[uid]._am / 10) * 10).."x "..Save.Get().Inventory.Pet[uid].id.." into gold"})
+
+            NetworkModule.Invoke("RainbowMachine_Activate", uid, math.floor(Save.Get().Inventory.Pet[uid]._am / 10))
+        else
+            NotificationCmds.Message.Bottom({Color=Color3.fromRGB(255, 90, 90), Message="No Eligible Pet Found"})
+            NotificationCmds.Message.Bottom({Color=Color3.new(1, 1, 1), Message="Hatching Eggs"})
+            QuestFunctions["GOLD_PET"]((getQuest().Amount - getQuest().Progress) * 10)
+        end
+    end,
+    ]]
     NON_BLOCKING_CURRENCY = function(num)
             --if getQuest(num).CurrenciID == "Diamonds" then // Non-blocking works fine tbh
         --    DIAMOND_BREAKABLE(num)
@@ -701,7 +815,23 @@ QuestFunctions = {
     
         NotificationCmds.Message.Bottom({Color=Color3.new(1, 1, 1), Message="Completed Unlock Area"})
     end,
-    BLOCKING_BEST_COMET = function(num) -- BLOCKING COMET
+    NON_BLOCKING_BEST_SUPERIOR_MINI_CHEST = function(num)
+        GlobalAutoTapper:Pause()
+        local autoTapper = autoTap("minichest")
+        repeat
+            task.wait(.1)
+        until getQuest(num).Progress >= getQuest(num).Amount or not string.find(parentFunc(), getQuest(num).Name)
+
+        autoTapper:Stop()
+        GlobalAutoTapper:Resume()
+    
+        table.remove(CurrentNonBlocking, table.find(CurrentNonBlocking, parentFunc()))
+        NotificationCmds.Message.Bottom({Color=Color3.new(1, 1, 1), Message="Completed Best Mini Chest"})
+    end,
+    NON_BLOCKING_SUPERIOR_MINI_CHEST = function(num)
+        QuestFunctions.NON_BLOCKING_BEST_SUPERIOR_MINI_CHEST(num)
+    end,
+    BEST_COMET = function(num) -- BLOCKING COMET
         local Zone = ZoneCmds.GetMaxOwnedZone()
 
         --TeleportToZone(Zone)
@@ -733,7 +863,7 @@ QuestFunctions = {
     
         NotificationCmds.Message.Bottom({Color=Color3.new(1, 1, 1), Message="Completed Best Comet"})
     end,
-    NON_BLOCKING_COMET = function(num)
+    COMET = function(num)
         local Zone = ZoneCmds.GetMaxOwnedZone()
 
         --TeleportToZone(Zone)
@@ -814,6 +944,8 @@ if Config.Performance.SimpleFpsBooster then
     end
 end
 
+pcall(function() workspace.__THINGS.__FAKE_GROUND:Destroy() end)
+
 -- Auto World 
 task.spawn(function()
     if Config.AutoWorld.Enabled then
@@ -823,6 +955,16 @@ task.spawn(function()
 
     while AutoProgress and Config.AutoWorld.Enabled do
         repeat task.wait() until CurrentlyFarming
+
+        if WorldsUtil.GetWorldNumber() == 3 and getZoneQuest() then
+            local quest = getZoneQuest()
+
+            if not ((QuestFunctions["NON_BLOCKING_"..quest.Name] ~= nil and QuestFunctions["NON_BLOCKING_"..quest.Name]()) or (QuestFunctions[quest.Name] and QuestFunctions[quest.Name]())) then
+                NotificationCmds.Message.Bottom({Color=Color3.fromRGB(255, 90, 90), Message=quest.Name.." not found!"})
+                --error(quest.Name.." not found")
+                --return
+            end
+        end
 
         if not OldZone or ZoneCmds.GetMaxOwnedZone() ~= OldZone and not Variables.IsRankingUp then
             --if RebirthCmds.Get() >= 4 and WorldsUtil.GetWorld().WorldNumber == 1 then
@@ -1006,6 +1148,7 @@ task.spawn(function()
     local dqt = {}
 
     local function checkQuest(quest)
+        print(typeof(IgnoredQuests), typeof(dqt), typeof(CurrentNonBlocking))
         if QuestFunctions["NON_BLOCKING_"..quest] and not table.find(IgnoredQuests, quest) and not table.find(dqt, quest) and not table.find(CurrentNonBlocking, quest) and not Variables.IsRankingUp then
             return "NON_BLOCKING", QuestFunctions["NON_BLOCKING_"..quest]
         elseif QuestFunctions[quest] and not table.find(IgnoredQuests, quest) and not table.find(dqt, quest) and #CurrentNonBlocking == 0 and not Variables.IsRankingUp then
@@ -1013,7 +1156,7 @@ task.spawn(function()
         end
     end
 
-    while AutoProgress and Config.AutoRank.Enabled do
+    while AutoProgress and Config.AutoRank.Enabled and WorldsUtil.GetWorldNumber() ~= 3 do
         if typeof(Config.AutoRank.InitialRank) == "boolean" and Config.AutoRank.InitialRank == false or Save.Get().Rank >= Config.AutoRank.InitialRank then
             print("Auto Rank has finished doing initial rank")
         end
@@ -1041,14 +1184,14 @@ task.spawn(function()
         for i, data in pairs(getQuests()) do
             local quest = getQuest(i)
             for i, v in pairs(quest) do print(i, v) end
-            local check, questFunc = checkQuest(quest.Name) 
+            local check, questFunc = checkQuest(quest.Name)
             if check and check == "NON_BLOCKING" then
                 print("[STARTING] NON BLOCKING "..quest.Name)
                 --CurrentlyFarming = false
                 NotificationCmds.Message.Bottom({Color=Color3.new(1, 1, 1), Message="Starting "..quest.Name})
                 questFunc(i)
                 --CurrentlyFarming = true
-            elseif check and check == "BLOCKING" then
+            elseif check and check == "BLOCKING" and WorldsUtil.GetWorldNumber() ~= 3 then
                 print("[STARTING] BLOCKING "..quest.Name)
                 NotificationCmds.Message.Bottom({Color=Color3.new(1, 1, 1), Message="Starting "..quest.Name})
                 CurrentlyFarming = false
@@ -1063,115 +1206,6 @@ task.spawn(function()
             end
         end
     end
-end)
 
-if true == false then
-    function numberToRoman(num)
-        local roman = ""
-        local romanNumberMap = {
-            {1000, 'M'},
-            {900, 'CM'},
-            {500, 'D'},
-            {400, 'CD'},
-            {100, 'C'},
-            {90, 'XC'},
-            {50, 'L'},
-            {40, 'XL'},
-            {10, 'X'},
-            {9, 'IX'},
-            {5, 'V'},
-            {4, 'IV'},
-            {1, 'I'}
-            
-        }
-        while num > 0 do
-            for index,v in pairs(romanNumberMap)do 
-                local romanChar = v[2]
-                local int = v[1]
-                while num >= int do
-                    roman = roman..romanChar
-                    num = num - int
-                end
-            end
-        end
-        return roman
-    end
-    
-    local function convertToComma(Number, PositiveSign)
-        local formatted, k = Number
-        while true do  
-            formatted, k = string.gsub(formatted, "^(-?%d+)(%d%d%d)", '%1,%2')
-            if (k==0) then
-                break
-            end
-        end
-        if PositiveSign then
-            if Number > 0 then
-                return "+"..formatted
-            end
-        end
-        
-        return formatted
-    end
-    
-    function formatTime(Seconds, fullhms)
-        local function format(num)
-            return string.format("%02i", num)
-        end
-    
-        local Minutes = (Seconds - Seconds%60)/60
-        Seconds = Seconds - Minutes*60
-        local Hours = (Minutes - Minutes%60)/60
-        Minutes = Minutes - Hours*60
-        if not fullhms and Hours == 0 then
-            return format(Minutes)..":"..format(Seconds)
-        else
-            return format(Hours)..":"..format(Minutes)..":"..format(Seconds)
-        end
-    end
-    
-    local activePotionsFormatted = ""
-    
-    for potionType, data in pairs(PotionCmds.GetActivePotions()) do
-        for val, time in pairs(data) do
-            print(potionType, val, time)
-            activePotionsFormatted = activePotionsFormatted..potionType.." Potion "..numberToRoman(val).." ("..formatTime(time)..")".."\n"
-        end
-    end
-    
-    local data = {
-        ["username"] =  "webhook thingie",
-        ["avatar_url"] = "https://cdn.discordapp.com/avatars/593552251939979275/58ea82801d6003749293c7bba1efabc8.webp?size=1024&format=webp&width=0&height=256",
-        ["content"] = "",
-        ["embeds"] = {
-            {
-                ["author"] = {
-                    ["name"] = game.Players.LocalPlayer.Name,
-                    ["url"] = "https://www.roblox.com/users/" ..game.Players.LocalPlayer.UserId,
-                    ["icon_url"] = HttpService:JSONDecode(request({Url = "https://thumbnails.roblox.com/v1/users/avatar-bust?userIds=" .. game.Players.LocalPlayer.UserId .. "&size=420x420&format=Png&isCircular=false", Method = "GET", Headers = {["Content-Type"] = "application/json"}}).Body).data[1].imageUrl,
-                },
-                ["title"] = "Pet Simulator 99 ("..Config.Webhooks.Statistics.Delay.."s)",
-                ["color"] = 0x212325,
-                ["description"] =  [[
-    <:Gems:1114627263808421919>  **Diamonds**
-     ```
-    ]]..convertToComma(CurrencyCmds.Get("Diamonds"))..[[
-    ```
-    
-    <:Potion:1239350598298505217> **Boosts**
-    ```]]..activePotionsFormatted..
-    [[```
-                ]],
-                ["thumbnail"] = {
-                    ["url"] = "https://cdn.discordapp.com/attachments/1213966172932939816/1252329987114139758/6ocaKOJ.png?ex=6671d2b0&is=66708130&hm=c3792d7e1c5b7cb4db88b20aeb8922f9c448510b591ec486a885b9ce3a1e582f&"
-                },
-                ["footer"] = {
-                    ["text"] = "00:00:00 - World "..WorldsUtil.GetWorldNumber().." - Zone X (XYZ)"
-                }
-            },
-        },
-        --['timestamp'] = DateTime(),
-    }
-    
-    request({Url = Config.Webhooks.Statistics.WebhookUrl, Method = "POST", Headers = {["Content-Type"] = "application/json"}, Body = HttpService:JSONEncode(data)})
-end
+    print("nono")
+end)
