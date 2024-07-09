@@ -3,7 +3,7 @@ getgenv().AutoProgress = false
 getgenv().AutoProgress = true -- ✅
 getgenv().Config = {
     AutoWorld = {
-        Enabled = false, -- ✅
+        Enabled = true, -- ✅
         PurchasePetSlots = true, -- ✅
         AutoTap = true, -- ✅
         UseTntOnDelay = false, -- Use tnt on set intervals, does not respect SmartTnt
@@ -13,7 +13,7 @@ getgenv().Config = {
         FarmUnderMap = true,
     },
     AutoRank = {
-        Enabled = true, -- ✅
+        Enabled = false, -- ✅
         InitialRank = 10, -- Rank up to rank n before/during Auto World, false to skip. ✅
         IgnoredQuests = {"DIAMOND_BREAKABLE"}, -- ✅
         Flags = {"Magnet Flag", "Coins Flag", "Hasty Flag", "Magnet Flag", "Diamonds Flag"}, -- Flags to use for USE_FLAG quest ✅
