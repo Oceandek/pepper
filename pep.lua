@@ -51,7 +51,7 @@ getgenv().Config = {
     },
     Client = {
         Blackout = {
-            Enabled = false,
+            Enabled = true,
             Toggle = Enum.KeyCode.P,
             Disable3dRendering = true
         },
