@@ -1,3 +1,5 @@
+--ok
+
 getgenv().Config = {
     Farming = {
         AutoCollectOrbs = true,
@@ -68,115 +70,7 @@ local BreakableCmds = require(game.ReplicatedStorage.Library.Client.BreakableCmd
 local RebirthCmds = require(Library.Client.RebirthCmds)
 local UltimateCmds = require(Library.Client.UltimateCmds)
 
-local blacklist = {
-    "Idle Tracking",
-    "Mobile",
-    "Server Closing",
-    "Pending",
-    "Inventory",
-    "Ultimate",
-    "ClientMagicOrbs",
-    "Random Global Events",
-    "Currency 2",
-    "Pet",
-    "Egg"
-}
 
-for _, v in pairs(game:GetService("Players").LocalPlayer.PlayerScripts.Scripts:GetDescendants()) do
-    if v:IsA("Script") and not table.match(blacklist, v.Name) and ((not v.Parent) or v.Parent.Name ~= "Breakables") and ((not v.Parent) or v.Parent.Name ~= "Random Events") and ((not v.Parent) or v.Parent.Name ~= "GUI") then
-        if Config.Client.Debug then
-            print("[PERFORMANCE][PLAYERSCRIPTS][DESTROYED]", v.Name)
-        end
-        v:Destroy()
-    end
-end
-
-local blacklist = {
-    "Flags",
-    "Sprinkler",
-    "Instances",
-    "Items",
-    "Loot",
-    "Orb",
-    "__",
-    "Breakable",
-    "RandomEvents",
-    "Chest",
-    "Egg",
-    "Pet"
-}
-
-local whitelist = {
-    "RenderedEggs",
-    "__FAKE_GROUND"
-}
-
-local path = (workspace.__THINGS.Eggs:FindFirstChild("World"..WorldsUtil.GetWorldNumber()) or workspace.__THINGS.Eggs.Main)
-for i, v in pairs(path:GetChildren()) do
-    local p = Instance.new("Part", path)
-    p.Name = v.Name
-    p.Anchored = true
-    p.CFrame = v.WorldPivot
-    if Config.Client.Debug then
-        print("[PERFORMANCE][EGGS][DESTROYED]", v.Name)
-    end
-    v:Destroy()
-end
-
-for _, v in pairs(workspace.__THINGS:GetChildren()) do
-    if (not table.match(blacklist, v.Name) or table.match(whitelist, v.Name)) then
-        if Config.Client.Debug then
-            print("[PERFORMANCE][__THINGS][DESTROYED]", v.Name)
-        end
-        v:Destroy()
-    end
-end
-
-local paths = {
-    (workspace:FindFirstChild("ALWAYS_RENDERING_"..WorldsUtil.GetWorldNumber()) or workspace.ALWAYS_RENDERING),
-    (workspace:FindFirstChild("Border"..WorldsUtil.GetWorldNumber()) or workspace.Border),
-    (workspace:FindFirstChild("FlyBorder"..WorldsUtil.GetWorldNumber()) or workspace.FlyBorder),
-    --workspace.__DEBRIS
-}
-
-for _, v in pairs(paths) do
-    if v.Parent then
-        if Config.Client.Debug then
-            print("[PERFORMANCE][PATH][DESTROYED]", v.Name)
-        end
-        v:Destroy()
-    end
-end
-
-if Config.Performance.FpsBooster.InvisibleMap then
-    if Config.Client.Debug then
-        print("[PERFORMANCE] Invisible Map")
-    end
-    for _, v in pairs(WorldsUtil.GetMap():GetDescendants()) do
-        pcall(function()
-            v.Transparency = 1
-        end)
-    end
-end
-
-for i, v in pairs(require(game:GetService("ReplicatedStorage").Library.Client.WorldFX)) do
-    if Config.Client.Debug then
-        print("[PERFORMANCE][WORLDFX][DISABLED]", i)
-    end
-    require(game:GetService("ReplicatedStorage").Library.Client.WorldFX)[i] = function()
-        return
-    end
-end
-
-for i, v in pairs(game:GetService("ReplicatedStorage").Assets.Particles:GetDescendants()) do
-    if v:IsA("ParticleEmitter") then
-        if Config.Client.Debug then
-            print("[PERFORMANCE][PARTICLES][DISABLED]", v.Name)
-        end
-        v.Texture = ""
-        v.TimeScale = 0
-    end
-end
 
 -- LocalScripts
 local AutoTapper = getsenv(LocalPlayer.PlayerScripts.Scripts.GUIs["Auto Tapper"])
