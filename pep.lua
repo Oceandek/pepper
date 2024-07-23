@@ -44,7 +44,7 @@ getgenv().Config = {
     Performance = {
         SetFpsCap = 999, -- ✅
         FpsBooster = {
-            Enabled = false,
+            Enabled = true,
             InvisibleMap = true,
         },
         Disable3dRendering = false -- ✅
