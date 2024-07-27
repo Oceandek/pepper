@@ -44,7 +44,7 @@ getgenv().Config = {
     Performance = {
         SetFpsCap = 999, -- ✅
         FpsBooster = {
-            Enabled = false,
+            Enabled = true,
             InvisibleMap = true,
         },
         Disable3dRendering = false -- ✅
@@ -101,8 +101,7 @@ local Directory = ReplicatedStorage.__DIRECTORY
 local Network = ReplicatedStorage.Network
 
 local NetworkModule = require(Library.Client.Network)
-local TabController = require(game.ReplicatedStorage.Library.Client.TabController)
-local GUI = require(ReplicatedStorage.Library.Client.GUI)
+local OrbTypes = require(Library.Types.Orbs).Types
 
 local Save = require(Library.Client.Save)
 local Signal = require(Library.Signal)
@@ -226,6 +225,7 @@ local Quests = {}
 local DelayedQuests = {}
 local IgnoredQuests = Config.AutoRank.IgnoredQuests
 local CurrentZone = MapCmds.GetCurrentZone()
+local autowrld, autornk = true, true
 
 for i, v in pairs(require(Library.Types.Quests)["Goals"]) do
     Quests[v] = i
@@ -261,8 +261,12 @@ end)
 if Config.Farming.AutoCollectOrbs then
     local orbs, lootbags = {}, {}
 
-    hookfunction(require(game:GetService("ReplicatedStorage").Library.Client.OrbCmds.Orb).new, function(uid)
-        table.insert(orbs, uid)
+    hookfunction(require(game:GetService("ReplicatedStorage").Library.Client.OrbCmds.Orb).new, function(uid, _, _, orb)
+        if orb.Type ~= OrbTypes.Lootbag then
+            table.insert(orbs, uid)
+        else
+            table.insert(lootbags, uid)
+        end
         return
     end)
 
@@ -759,7 +763,11 @@ QuestFunctions = {
             return table.insert(IgnoredQuests, parentFunc())
         end
     
-        Players.LocalPlayer.Character.HumanoidRootPart.CFrame = (workspace.__THINGS.Eggs:FindFirstChild("World"..WorldsUtil.GetWorldNumber()) or workspace.__THINGS.Eggs:FindFirstChild("Main"))[EggId .. " - Egg Capsule"].Tier.CFrame + Vector3.new(0, 5, 0)
+        if Config.FpsBooster.Enabled then
+            Players.LocalPlayer.Character.HumanoidRootPart.CFrame = (workspace.__THINGS.Eggs:FindFirstChild("World"..WorldsUtil.GetWorldNumber()) or workspace.__THINGS.Eggs:FindFirstChild("Main"))[EggId .. " - Egg Capsule"].CFrame + Vector3.new(0, 5, 0)
+        else
+            Players.LocalPlayer.Character.HumanoidRootPart.CFrame = (workspace.__THINGS.Eggs:FindFirstChild("World"..WorldsUtil.GetWorldNumber()) or workspace.__THINGS.Eggs:FindFirstChild("Main"))[EggId .. " - Egg Capsule"].Tier.CFrame + Vector3.new(0, 5, 0)
+        end
     
         NotificationCmds.Message.Bottom({Color=Color3.new(1, 1, 1), Message="Hatching "..HatchCount.."x "..EggsUtil.GetIdByNumber(EggId).."s"})
     
@@ -772,7 +780,11 @@ QuestFunctions = {
         local HatchCount = Save.Get().EggHatchCount
     
         --Players.LocalPlayer.Character.HumanoidRootPart.Anchored = true
-        Players.LocalPlayer.Character.HumanoidRootPart.CFrame = (workspace.__THINGS.Eggs:FindFirstChild("World"..WorldsUtil.GetWorldNumber()) or workspace.__THINGS.Eggs:FindFirstChild("Main"))[Save.Get().MaximumAvailableEgg .. " - Egg Capsule"].Tier.CFrame + Vector3.new(0, 5, 0)
+        if Config.FpsBooster.Enabled then
+            Players.LocalPlayer.Character.HumanoidRootPart.CFrame = (workspace.__THINGS.Eggs:FindFirstChild("World"..WorldsUtil.GetWorldNumber()) or workspace.__THINGS.Eggs:FindFirstChild("Main"))[Save.Get().MaximumAvailableEgg .. " - Egg Capsule"].CFrame + Vector3.new(0, 5, 0)
+        else
+            Players.LocalPlayer.Character.HumanoidRootPart.CFrame = (workspace.__THINGS.Eggs:FindFirstChild("World"..WorldsUtil.GetWorldNumber()) or workspace.__THINGS.Eggs:FindFirstChild("Main"))[Save.Get().MaximumAvailableEgg .. " - Egg Capsule"].Tier.CFrame + Vector3.new(0, 5, 0)
+        end
     
         --NotificationCmds.Message.Bottom({Color=Color3.new(1, 1, 1), Message="Starting Auto Egg"})
         NotificationCmds.Message.Bottom({Color=Color3.new(1, 1, 1), Message="Hatching "..HatchCount.."x "..EggId.."s"})
@@ -1202,7 +1214,7 @@ if Config.Performance.FpsBooster.Enabled then
     }
     
     for _, v in pairs(game:GetService("Players").LocalPlayer.PlayerScripts.Scripts:GetDescendants()) do
-        if v:IsA("Script") and not table.match(blacklist, v.Name) and ((not v.Parent) or v.Parent.Name ~= "Breakables") and ((not v.Parent) or v.Parent.Name ~= "Random Events") and ((not v.Parent) or v.Parent.Name ~= "GUI") then
+        if v:IsA("Script") and not table.match(blacklist, v.Name) and ((not v.Parent) or v.Parent.Name ~= "Breakables") and ((not v.Parent) or v.Parent.Name ~= "Random Events") then
             if Config.Client.Debug then
                 print("[PERFORMANCE][PLAYERSCRIPTS][DESTROYED]", v.Name)
             end
@@ -1302,6 +1314,21 @@ if workspace.__THINGS:FindFirstChild("__FAKE_GROUND") then
     workspace.__THINGS.__FAKE_GROUND:Destroy()
 end
 
+function startFarm()
+    print("[STARTING] Farming")
+
+    TeleportToZone(ZoneCmds.GetMaxOwnedZone())
+
+    local EggId = EggsUtil.GetIdByNumber(Save.Get().MaximumAvailableEgg)
+    local HatchCount = Save.Get().EggHatchCount
+
+    NotificationCmds.Message.Bottom({Color=Color3.new(1, 1, 1), Message="Hatching "..HatchCount.."x "..EggId.."s"})
+
+    while task.wait(.2) do
+        Network.Eggs_RequestPurchase:InvokeServer(EggId, HatchCount)
+    end
+end
+
 -- Auto World 
 task.spawn(function()
     if Config.AutoWorld.Enabled then
@@ -1309,7 +1336,7 @@ task.spawn(function()
         GlobalAutoUltimate = autoUltimate()
     end
     
-    print("[STARTING] Auto Rank")
+    print("[STARTING] Auto World")
 
     while AutoProgress and Config.AutoWorld.Enabled do
         repeat task.wait() until CurrentlyFarming
@@ -1370,7 +1397,13 @@ task.spawn(function()
 
     end
 
+    autowrld = false
+
     print("[DISABLED] Auto World")
+
+    if not autowrld and not autornk then
+        startFarm()
+    end
 end)
 
 -- TNT Interval
@@ -1429,6 +1462,7 @@ task.spawn(function()
     end)
 end)
 
+--[[
 -- Auto Tap
 task.spawn(function()
     while AutoProgress and Config.AutoWorld.AutoTap do
@@ -1451,6 +1485,7 @@ task.spawn(function()
         task.wait(1)
     end
 end)
+]]
 
 -- Auto Rebirth
 task.spawn(function()
@@ -1522,6 +1557,7 @@ task.spawn(function()
     while AutoProgress and Config.AutoRank.Enabled and WorldsUtil.GetWorldNumber() ~= 3 do
         if typeof(Config.AutoRank.InitialRank) == "boolean" and Config.AutoRank.InitialRank == false or Save.Get().Rank >= Config.AutoRank.InitialRank then
             print("[FINISHED] Initial Auto Rank")
+            break
         end
 
         if #getQuests() == 0 then
@@ -1570,5 +1606,11 @@ task.spawn(function()
         end
     end
 
+    autornk = false
+
     print("[DISABLED] Auto Rank")
+
+    if not autornk and not autowrld then
+        startFarm()
+    end
 end)
