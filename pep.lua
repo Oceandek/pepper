@@ -1,5 +1,5 @@
 getgenv().AutoProgress = false
---task.wait(2)
+--task.wait(2)000
 getgenv().AutoProgress = true -- ✅
 getgenv().Config = {
     AutoWorld = {
@@ -261,12 +261,8 @@ end)
 if Config.Farming.AutoCollectOrbs then
     local orbs, lootbags = {}, {}
 
-    hookfunction(require(game:GetService("ReplicatedStorage").Library.Client.OrbCmds.Orb).new, function(uid, _, _, orb)
-        if orb.Type ~= OrbTypes.Lootbag then
-            table.insert(orbs, uid)
-        else
-            table.insert(lootbags, uid)
-        end
+    hookfunction(require(game:GetService("ReplicatedStorage").Library.Client.OrbCmds.Orb).new, function(uid)
+        table.insert(orbs, uid)
         return
     end)
 
@@ -1214,7 +1210,7 @@ if Config.Performance.FpsBooster.Enabled then
     }
     
     for _, v in pairs(game:GetService("Players").LocalPlayer.PlayerScripts.Scripts:GetDescendants()) do
-        if v:IsA("Script") and not table.match(blacklist, v.Name) and ((not v.Parent) or v.Parent.Name ~= "Breakables") and ((not v.Parent) or v.Parent.Name ~= "Random Events") then
+        if v:IsA("Script") and not table.match(blacklist, v.Name) and ((not v.Parent) or v.Parent.Name ~= "Breakables") and ((not v.Parent) or v.Parent.Name ~= "Random Events") and ((not v.Parent) or v.Parent.Name ~= "GUI") then
             if Config.Client.Debug then
                 print("[PERFORMANCE][PLAYERSCRIPTS][DESTROYED]", v.Name)
             end
